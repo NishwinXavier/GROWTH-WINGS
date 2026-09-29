@@ -1,9 +1,20 @@
+import Lenis from 'lenis';
+import 'lenis/dist/lenis.css';
+
 /**
  * NEXX Digital Marketing & Media Agency — Client-Side Application
  * Premium Blue & White Experience
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // 0. Initialize Lenis Smooth Scroll Engine
+  const lenis = new Lenis({
+    autoRaf: true,
+    smoothWheel: true,
+    duration: 1.2,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+  });
+
   // 1. DOM Elements
   const navbar = document.getElementById('navbar');
   const navToggle = document.getElementById('navToggle');
@@ -86,15 +97,34 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('scroll', handleScroll, { passive: true });
   handleScroll();
 
-  // Back to top action
+  // Connect Lenis to scroll handlers
+  lenis.on('scroll', () => {
+    handleScroll();
+    if (typeof updateServicesScroll === 'function') {
+      updateServicesScroll();
+    }
+  });
+
+  // Back to top action via Lenis
   if (backToTopBtn) {
     backToTopBtn.addEventListener('click', () => {
-      window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
+      lenis.scrollTo(0, { duration: 1.2 });
     });
   }
+
+  // Smooth scroll for all on-page anchor navigation links
+  document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+    anchor.addEventListener('click', (e) => {
+      const href = anchor.getAttribute('href');
+      if (href && href.length > 1) {
+        const targetEl = document.querySelector(href);
+        if (targetEl) {
+          e.preventDefault();
+          lenis.scrollTo(targetEl, { offset: -35, duration: 1.2 });
+        }
+      }
+    });
+  });
 
   // 4. Mobile Navigation Toggle
   const toggleMobileMenu = () => {
@@ -392,10 +422,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const pTarget = cardScrollTargets[targetIndex] ?? 0;
       const targetScroll = containerTop + pTarget * scrollableDistance;
 
-      window.scrollTo({
-        top: targetScroll,
-        behavior: 'smooth'
-      });
+      if (lenis) {
+        lenis.scrollTo(targetScroll, { duration: 1.1 });
+      } else {
+        window.scrollTo({
+          top: targetScroll,
+          behavior: 'smooth'
+        });
+      }
     });
   });
 

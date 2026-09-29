@@ -827,20 +827,107 @@ button {
 }
 
 /* 6. TRUST TICKER SECTION */
+/* 6. TRUST TICKER SECTION — ENHANCED BRAND IMPACT ECOSYSTEM */
 .trust-ticker-section {
-  background-color: var(--surface-ice-1);
-  padding: 1.75rem 0;
-  border-bottom: 1px solid var(--border-light);
+  position: relative;
+  background: linear-gradient(180deg, #060e24 0%, #040a1c 50%, #030816 100%);
+  padding: clamp(3.5rem, 6vw, 5rem) 0 clamp(3rem, 5vw, 4.5rem);
+  border-top: 1px solid rgba(0, 82, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 82, 255, 0.18);
   overflow: hidden;
 }
 
-.ticker-label {
-  text-align: center;
-  font-size: 0.75rem;
+.ticker-ambient-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 900px;
+  height: 250px;
+  background: radial-gradient(ellipse at center, rgba(0, 82, 255, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ticker-intro-container {
+  position: relative;
+  z-index: 5;
+  margin-bottom: 2.75rem;
+}
+
+.ticker-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.95rem;
+  background: rgba(0, 82, 255, 0.15);
+  border: 1px solid rgba(0, 82, 255, 0.35);
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.2em;
-  color: var(--text-dark-muted);
+  letter-spacing: 0.14em;
+  color: var(--cyan-accent);
   margin-bottom: 1rem;
+}
+
+.ticker-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan-accent);
+  box-shadow: 0 0 10px var(--cyan-accent);
+  animation: pulse-glow 2s infinite;
+}
+
+.ticker-heading {
+  font-family: var(--font-heading);
+  font-size: clamp(1.4rem, 2.5vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--pure-white);
+  line-height: 1.25;
+  max-width: 780px;
+  margin: 0 auto 1.25rem;
+}
+
+.ticker-stats-ribbon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.65rem 1.75rem;
+  background: rgba(6, 14, 36, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+.ribbon-stat-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.ribbon-stat-val {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--cyan-accent);
+}
+
+.ribbon-stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-light-muted);
+  letter-spacing: 0.02em;
+}
+
+.ribbon-stat-divider {
+  color: rgba(255, 255, 255, 0.15);
+  font-size: 0.85rem;
+  font-weight: 300;
 }
 
 .ticker-track {
@@ -848,6 +935,8 @@ button {
   overflow: hidden;
   position: relative;
   display: flex;
+  padding: 0.75rem 0;
+  z-index: 5;
 }
 
 .ticker-track::before,
@@ -855,48 +944,85 @@ button {
   content: '';
   position: absolute;
   top: 0;
-  width: 100px;
+  width: clamp(80px, 15vw, 200px);
   height: 100%;
-  z-index: 2;
+  z-index: 10;
   pointer-events: none;
 }
 
 .ticker-track::before {
   left: 0;
-  background: linear-gradient(90deg, var(--surface-ice-1) 0%, transparent 100%);
+  background: linear-gradient(90deg, #030816 0%, rgba(3, 8, 22, 0.8) 50%, transparent 100%);
 }
 
 .ticker-track::after {
   right: 0;
-  background: linear-gradient(270deg, var(--surface-ice-1) 0%, transparent 100%);
+  background: linear-gradient(270deg, #030816 0%, rgba(3, 8, 22, 0.8) 50%, transparent 100%);
 }
 
 .ticker-content {
   display: flex;
   align-items: center;
-  gap: 3rem;
+  gap: 1.5rem;
   white-space: nowrap;
-  animation: infinite-ticker 32s linear infinite;
+  animation: infinite-ticker 36s linear infinite;
+  will-change: transform;
 }
 
-.ticker-brand {
-  font-family: var(--font-heading);
+.ticker-track:hover .ticker-content {
+  animation-play-state: paused;
+}
+
+.ticker-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1.4rem;
+  background: rgba(8, 20, 52, 0.6);
+  border: 1px solid rgba(0, 82, 255, 0.22);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: default;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.ticker-brand-badge:hover {
+  background: rgba(10, 26, 68, 0.85);
+  border-color: var(--cyan-accent);
+  box-shadow: 0 8px 30px rgba(0, 82, 255, 0.35);
+  transform: translateY(-3px);
+}
+
+.brand-badge-icon {
   font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--primary-deep-blue);
-  opacity: 0.82;
+  color: var(--cyan-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-badge-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.brand-badge-name {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 800;
   letter-spacing: 0.05em;
-  transition: opacity var(--transition-fast);
+  color: #ffffff;
 }
 
-.ticker-brand:hover {
-  opacity: 1;
-  color: var(--electric-blue);
-}
-
-.ticker-dot {
-  color: var(--electric-blue);
-  font-size: 0.85rem;
+.brand-badge-tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.03em;
 }
 
 @keyframes infinite-ticker {
