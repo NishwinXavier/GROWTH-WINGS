@@ -7,13 +7,27 @@ import 'lenis/dist/lenis.css';
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 0. Initialize Lenis Smooth Scroll Engine
+  // 0. Initialize Lenis Smooth Scroll Engine (120fps silky momentum scrolling)
   const lenis = new Lenis({
-    autoRaf: true,
+    duration: 1.25,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Silky exponential curve
+    orientation: 'vertical',
+    gestureOrientation: 'vertical',
     smoothWheel: true,
-    duration: 1.2,
-    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    wheelMultiplier: 1.0,
+    touchMultiplier: 1.2,
+    infinite: false,
   });
+
+  // RAF ticker loop driving Lenis scroll updates continuously
+  const raf = (time) => {
+    lenis.raf(time);
+    requestAnimationFrame(raf);
+  };
+  requestAnimationFrame(raf);
+
+  // Expose globally for console access or interactions
+  window.lenis = lenis;
 
   // 1. DOM Elements
   const navbar = document.getElementById('navbar');
@@ -95,36 +109,43 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.addEventListener('scroll', handleScroll, { passive: true });
+  if (lenis) {
+    lenis.on('scroll', handleScroll);
+  }
   handleScroll();
 
-  // Connect Lenis to scroll handlers
-  lenis.on('scroll', () => {
-    handleScroll();
-    if (typeof updateServicesScroll === 'function') {
-      updateServicesScroll();
-    }
-  });
-
-  // Back to top action via Lenis
-  if (backToTopBtn) {
-    backToTopBtn.addEventListener('click', () => {
-      lenis.scrollTo(0, { duration: 1.2 });
-    });
-  }
-
-  // Smooth scroll for all on-page anchor navigation links
+  // Smooth scroll handler for all anchor links
   document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     anchor.addEventListener('click', (e) => {
-      const href = anchor.getAttribute('href');
-      if (href && href.length > 1) {
-        const targetEl = document.querySelector(href);
-        if (targetEl) {
-          e.preventDefault();
-          lenis.scrollTo(targetEl, { offset: -35, duration: 1.2 });
+      const targetId = anchor.getAttribute('href');
+      if (!targetId || targetId === '#') return;
+      const targetElement = document.querySelector(targetId);
+      if (targetElement) {
+        e.preventDefault();
+        if (lenis) {
+          lenis.scrollTo(targetElement, { offset: -70, duration: 1.15 });
+        } else {
+          const topPos = targetElement.getBoundingClientRect().top + window.scrollY - 70;
+          window.scrollTo({ top: topPos, behavior: 'smooth' });
         }
       }
     });
   });
+
+  // Back to top action
+  if (backToTopBtn) {
+    backToTopBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (lenis) {
+        lenis.scrollTo(0, { duration: 1.2 });
+      } else {
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }
+    });
+  }
 
   // 4. Mobile Navigation Toggle
   const toggleMobileMenu = () => {
@@ -134,11 +155,13 @@ document.addEventListener('DOMContentLoaded', () => {
       navToggle.classList.remove('open');
       navToggle.setAttribute('aria-expanded', 'false');
       document.body.style.overflow = '';
+      if (lenis) lenis.start();
     } else {
       mobileDrawer.classList.add('open');
       navToggle.classList.add('open');
       navToggle.setAttribute('aria-expanded', 'true');
       document.body.style.overflow = 'hidden';
+      if (lenis) lenis.stop();
     }
   };
 
@@ -180,7 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 6. Services Section — High-End Scroll-Driven Stacked-Card Engine
+
+  // 6. Services Section — Ultra-Smooth Scroll-Driven Stacked-Card Engine
   const servicesHeader = document.getElementById('servicesHeader');
   const servicesScrollContainer = document.getElementById('servicesScrollContainer');
   const servicesCardsStage = document.getElementById('servicesCardsStage');
@@ -203,6 +227,25 @@ document.addEventListener('DOMContentLoaded', () => {
     servicesHeader.classList.add('in-view');
   }
 
+  // Smoothstep ease curve for zero jerk (derivative 0 at start and end)
+  const smoothstep = (t) => t * t * (3 - 2 * t);
+
+  // Cached layout metrics to avoid layout thrashing on scroll
+  let cachedStageHeight = 640;
+  let cachedScrollableDistance = 1;
+  let cachedStageTopOffset = 96;
+
+  const measureServicesLayout = () => {
+    if (!servicesScrollContainer || !servicesCardsStage) return;
+    cachedStageHeight = servicesCardsStage.offsetHeight || 640;
+    const containerHeight = servicesScrollContainer.offsetHeight || window.innerHeight * 4;
+    cachedScrollableDistance = Math.max(1, containerHeight - cachedStageHeight);
+    const stageStyle = window.getComputedStyle(servicesCardsStage);
+    cachedStageTopOffset = parseFloat(stageStyle.top) || 96;
+  };
+
+  measureServicesLayout();
+
   // Scroll-Driven Sticky Card Stack Interaction (Desktop)
   let isTicking = false;
 
@@ -218,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
         card.style.transform = '';
         card.style.opacity = '1';
         card.style.visibility = 'visible';
-        card.style.filter = 'none';
         card.style.pointerEvents = 'auto';
         card.style.zIndex = '';
         const parallaxImg = card.querySelector('.visual-parallax-wrap');
@@ -227,31 +269,23 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const rect = servicesScrollContainer.getBoundingClientRect();
-    const containerHeight = servicesScrollContainer.offsetHeight;
-    const stageHeight = servicesCardsStage.offsetHeight;
-    const scrollableDistance = Math.max(1, containerHeight - stageHeight);
+    // Only one read: bounding rect top of container
+    const rectTop = servicesScrollContainer.getBoundingClientRect().top;
+    const scrolled = cachedStageTopOffset - rectTop;
+    const rawProgress = Math.max(0, Math.min(1, scrolled / cachedScrollableDistance));
 
-    // Compute stage sticky top offset
-    const stageStyle = window.getComputedStyle(servicesCardsStage);
-    const stageTopOffset = parseFloat(stageStyle.top) || 96;
-
-    // Progress within services scroll section (0.0 to 1.0)
-    const scrolled = stageTopOffset - rect.top;
-    const rawProgress = Math.max(0, Math.min(1, scrolled / scrollableDistance));
-
-    // Fill the minimal vertical indicator line
+    // Instant real-time progress fill tracking (no lag!)
     if (progressFill) {
-      progressFill.style.height = `${(rawProgress * 100).toFixed(1)}%`;
+      progressFill.style.height = `${(rawProgress * 100).toFixed(2)}%`;
     }
 
     // Active button tracking with clear zones
     let activeIndex = 0;
-    if (rawProgress >= 0.85) {
+    if (rawProgress >= 0.82) {
       activeIndex = 3;
-    } else if (rawProgress >= 0.58) {
+    } else if (rawProgress >= 0.55) {
       activeIndex = 2;
-    } else if (rawProgress >= 0.26) {
+    } else if (rawProgress >= 0.25) {
       activeIndex = 1;
     } else {
       activeIndex = 0;
@@ -262,12 +296,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // SOLID SLIDE-UP DECK ENGINE:
-    // Every card stays 100% opaque. No cross-fades where text blends together.
-    // Card 1 starts in place.
-    // Card 2 slides UP over Card 1.
-    // Card 3 slides UP over Card 2.
-    // Card 4 slides UP over Card 3 and stays locked in place through the end of the container.
-    // Outgoing cards recede slightly (scale 0.96) then hide once fully covered.
+    // Every card stays 100% opaque with buttery smoothstep interpolation.
+    // Floating-point translate3d ensures GPU sub-pixel compositing.
+    const slideTravel = cachedStageHeight + 30;
+
     serviceCards.forEach((card, i) => {
       let translateY = 0;
       let scale = 1;
@@ -276,74 +308,74 @@ document.addEventListener('DOMContentLoaded', () => {
       let pointerEvents = 'auto';
       let zIndex = 10 + i;
 
-      const slideTravel = stageHeight + 40;
-
       if (i === 0) {
-        if (rawProgress < 0.20) {
+        if (rawProgress < 0.18) {
           translateY = 0;
           scale = 1;
-        } else if (rawProgress < 0.32) {
-          const t = (rawProgress - 0.20) / 0.12;
-          translateY = -t * 15;
-          scale = 1 - 0.04 * t;
+        } else if (rawProgress < 0.34) {
+          const t = (rawProgress - 0.18) / 0.16;
+          const ease = smoothstep(t);
+          translateY = -ease * 16;
+          scale = 1 - 0.04 * ease;
           pointerEvents = t < 0.5 ? 'auto' : 'none';
         } else {
-          translateY = -15;
+          translateY = -16;
           scale = 0.96;
           opacity = 0;
           visibility = 'hidden';
           pointerEvents = 'none';
         }
       } else if (i === 1) {
-        if (rawProgress < 0.20) {
+        if (rawProgress < 0.18) {
           translateY = slideTravel;
           opacity = 0;
           visibility = 'hidden';
           pointerEvents = 'none';
-        } else if (rawProgress < 0.32) {
-          const t = (rawProgress - 0.20) / 0.12;
-          // Smooth ease-out curve
-          const ease = Math.sin((t * Math.PI) / 2);
+        } else if (rawProgress < 0.34) {
+          const t = (rawProgress - 0.18) / 0.16;
+          const ease = smoothstep(t);
           translateY = (1 - ease) * slideTravel;
           scale = 0.98 + 0.02 * ease;
-          pointerEvents = t > 0.7 ? 'auto' : 'none';
-        } else if (rawProgress < 0.52) {
+          pointerEvents = t > 0.6 ? 'auto' : 'none';
+        } else if (rawProgress < 0.50) {
           translateY = 0;
           scale = 1;
-        } else if (rawProgress < 0.64) {
-          const t = (rawProgress - 0.52) / 0.12;
-          translateY = -t * 15;
-          scale = 1 - 0.04 * t;
+        } else if (rawProgress < 0.66) {
+          const t = (rawProgress - 0.50) / 0.16;
+          const ease = smoothstep(t);
+          translateY = -ease * 16;
+          scale = 1 - 0.04 * ease;
           pointerEvents = t < 0.5 ? 'auto' : 'none';
         } else {
-          translateY = -15;
+          translateY = -16;
           scale = 0.96;
           opacity = 0;
           visibility = 'hidden';
           pointerEvents = 'none';
         }
       } else if (i === 2) {
-        if (rawProgress < 0.52) {
+        if (rawProgress < 0.50) {
           translateY = slideTravel;
           opacity = 0;
           visibility = 'hidden';
           pointerEvents = 'none';
-        } else if (rawProgress < 0.64) {
-          const t = (rawProgress - 0.52) / 0.12;
-          const ease = Math.sin((t * Math.PI) / 2);
+        } else if (rawProgress < 0.66) {
+          const t = (rawProgress - 0.50) / 0.16;
+          const ease = smoothstep(t);
           translateY = (1 - ease) * slideTravel;
           scale = 0.98 + 0.02 * ease;
-          pointerEvents = t > 0.7 ? 'auto' : 'none';
-        } else if (rawProgress < 0.80) {
+          pointerEvents = t > 0.6 ? 'auto' : 'none';
+        } else if (rawProgress < 0.78) {
           translateY = 0;
           scale = 1;
-        } else if (rawProgress < 0.90) {
-          const t = (rawProgress - 0.80) / 0.10;
-          translateY = -t * 15;
-          scale = 1 - 0.04 * t;
+        } else if (rawProgress < 0.92) {
+          const t = (rawProgress - 0.78) / 0.14;
+          const ease = smoothstep(t);
+          translateY = -ease * 16;
+          scale = 1 - 0.04 * ease;
           pointerEvents = t < 0.5 ? 'auto' : 'none';
         } else {
-          translateY = -15;
+          translateY = -16;
           scale = 0.96;
           opacity = 0;
           visibility = 'hidden';
@@ -351,17 +383,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else if (i === 3) {
         // CARD 4 (FINAL CARD): Slides up cleanly over Card 3, then locks in place until the end
-        if (rawProgress < 0.80) {
+        if (rawProgress < 0.78) {
           translateY = slideTravel;
           opacity = 0;
           visibility = 'hidden';
           pointerEvents = 'none';
-        } else if (rawProgress < 0.90) {
-          const t = (rawProgress - 0.80) / 0.10;
-          const ease = Math.sin((t * Math.PI) / 2);
+        } else if (rawProgress < 0.92) {
+          const t = (rawProgress - 0.78) / 0.14;
+          const ease = smoothstep(t);
           translateY = (1 - ease) * slideTravel;
           scale = 0.98 + 0.02 * ease;
-          pointerEvents = t > 0.7 ? 'auto' : 'none';
+          pointerEvents = t > 0.6 ? 'auto' : 'none';
         } else {
           // Locked in 100% active state through the rest of the container!
           translateY = 0;
@@ -369,23 +401,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Hardware-accelerated transformation with integer pixel translations
+      // Hardware-accelerated sub-pixel floating-point transform (smooth GPU layer compositing)
       if (translateY === 0 && scale === 1) {
-        card.style.transform = 'translateY(0) scale(1)';
+        card.style.transform = 'translate3d(0, 0, 0) scale(1)';
       } else {
-        card.style.transform = `translateY(${Math.round(translateY)}px) scale(${scale.toFixed(4)})`;
+        card.style.transform = `translate3d(0, ${translateY.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
       }
       card.style.opacity = opacity.toString();
       card.style.visibility = visibility;
-      card.style.filter = 'none';
       card.style.pointerEvents = pointerEvents;
       card.style.zIndex = zIndex;
 
       // Subtle Image Parallax inside card
       const parallaxImg = card.querySelector('.visual-parallax-wrap');
       if (parallaxImg) {
-        const pOffset = Math.round((i - activeIndex) * -8);
-        parallaxImg.style.transform = `translateY(${pOffset}px)`;
+        const pOffset = (i - activeIndex) * -6;
+        parallaxImg.style.transform = `translate3d(0, ${pOffset.toFixed(1)}px, 0)`;
       }
     });
   };
@@ -401,7 +432,16 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', onScroll, { passive: true });
+  window.addEventListener('resize', () => {
+    measureServicesLayout();
+    onScroll();
+  }, { passive: true });
+
+  // Hook into Lenis scroll lifecycle for 120fps lockstep smooth scroll
+  if (lenis) {
+    lenis.on('scroll', onScroll);
+  }
+
   updateServicesScroll();
 
   // Progress Nav Dot Click: Smooth scroll to selected card
@@ -415,15 +455,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const containerRect = servicesScrollContainer.getBoundingClientRect();
       const currentScrollY = window.scrollY;
       const containerTop = currentScrollY + containerRect.top;
-      const containerHeight = servicesScrollContainer.offsetHeight;
-      const stageHeight = servicesCardsStage.offsetHeight;
-      const scrollableDistance = containerHeight - stageHeight;
+      const scrollableDistance = cachedScrollableDistance;
 
       const pTarget = cardScrollTargets[targetIndex] ?? 0;
       const targetScroll = containerTop + pTarget * scrollableDistance;
 
       if (lenis) {
-        lenis.scrollTo(targetScroll, { duration: 1.1 });
+        lenis.scrollTo(targetScroll, { duration: 1.0 });
       } else {
         window.scrollTo({
           top: targetScroll,
@@ -515,40 +553,81 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-  // 10. Testimonials Slider
+  // 10. Testimonials Slider (Automatic Carousel)
+  const testimonialTrack = document.getElementById('testimonialTrack');
   const testimonialCards = document.querySelectorAll('.testimonial-card');
   const sliderDots = document.querySelectorAll('.slider-dot');
   const prevBtn = document.getElementById('prevTestimonial');
   const nextBtn = document.getElementById('nextTestimonial');
+  const testimonialContainer = document.querySelector('.testimonials-slider-container');
+
   let currentTestimonialIndex = 0;
   let testimonialAutoTimer = null;
+  const totalCards = testimonialCards.length;
+  const AUTOPLAY_INTERVAL = 4500; // Auto-advance every 4.5 seconds
 
-  const showTestimonial = (index) => {
+  const updateTestimonialCarousel = (index, immediate = false) => {
+    if (!testimonialTrack || totalCards === 0) return;
+    
+    // Wrap around index
+    currentTestimonialIndex = (index + totalCards) % totalCards;
+
+    if (immediate) {
+      testimonialTrack.style.transition = 'none';
+    } else {
+      testimonialTrack.style.transition = 'transform 0.65s cubic-bezier(0.16, 1, 0.3, 1)';
+    }
+
+    // Slide track smoothly with GPU acceleration
+    testimonialTrack.style.transform = `translate3d(-${currentTestimonialIndex * 100}%, 0, 0)`;
+
+    // Update active class for card focus & styling
     testimonialCards.forEach((card, i) => {
-      card.classList.toggle('active', i === index);
+      const isActive = i === currentTestimonialIndex;
+      card.classList.toggle('active', isActive);
+      card.setAttribute('aria-hidden', isActive ? 'false' : 'true');
     });
+
+    // Update dot indicators
     sliderDots.forEach((dot, i) => {
-      dot.classList.toggle('active', i === index);
+      const isActive = i === currentTestimonialIndex;
+      dot.classList.toggle('active', isActive);
+      dot.setAttribute('aria-current', isActive ? 'true' : 'false');
     });
-    currentTestimonialIndex = index;
   };
 
   const nextTestimonial = () => {
-    const nextIdx = (currentTestimonialIndex + 1) % testimonialCards.length;
-    showTestimonial(nextIdx);
+    updateTestimonialCarousel(currentTestimonialIndex + 1);
   };
 
   const prevTestimonial = () => {
-    const prevIdx = (currentTestimonialIndex - 1 + testimonialCards.length) % testimonialCards.length;
-    showTestimonial(prevIdx);
+    updateTestimonialCarousel(currentTestimonialIndex - 1);
   };
 
-  if (nextBtn && prevBtn) {
+  const startTestimonialAutoPlay = () => {
+    stopTestimonialAutoPlay();
+    testimonialAutoTimer = setInterval(nextTestimonial, AUTOPLAY_INTERVAL);
+  };
+
+  const stopTestimonialAutoPlay = () => {
+    if (testimonialAutoTimer) {
+      clearInterval(testimonialAutoTimer);
+      testimonialAutoTimer = null;
+    }
+  };
+
+  const resetTestimonialCycle = () => {
+    startTestimonialAutoPlay();
+  };
+
+  if (nextBtn) {
     nextBtn.addEventListener('click', () => {
       nextTestimonial();
       resetTestimonialCycle();
     });
+  }
 
+  if (prevBtn) {
     prevBtn.addEventListener('click', () => {
       prevTestimonial();
       resetTestimonialCycle();
@@ -558,29 +637,42 @@ document.addEventListener('DOMContentLoaded', () => {
   sliderDots.forEach((dot) => {
     dot.addEventListener('click', () => {
       const idx = parseInt(dot.getAttribute('data-index'), 10);
-      showTestimonial(idx);
+      updateTestimonialCarousel(idx);
       resetTestimonialCycle();
     });
   });
 
-  const startTestimonialCycle = () => {
-    clearInterval(testimonialAutoTimer);
-    testimonialAutoTimer = setInterval(nextTestimonial, 7000);
-  };
-
-  const resetTestimonialCycle = () => {
-    clearInterval(testimonialAutoTimer);
-    startTestimonialCycle();
-  };
-
-  startTestimonialCycle();
-
   // Pause on hover
-  const testimonialContainer = document.querySelector('.testimonials-slider-container');
   if (testimonialContainer) {
-    testimonialContainer.addEventListener('mouseenter', () => clearInterval(testimonialAutoTimer));
-    testimonialContainer.addEventListener('mouseleave', startTestimonialCycle);
+    testimonialContainer.addEventListener('mouseenter', stopTestimonialAutoPlay);
+    testimonialContainer.addEventListener('mouseleave', startTestimonialAutoPlay);
+
+    // Touch swipe support for mobile
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    testimonialContainer.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+      stopTestimonialAutoPlay();
+    }, { passive: true });
+
+    testimonialContainer.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      const swipeDistance = touchEndX - touchStartX;
+      if (Math.abs(swipeDistance) > 40) {
+        if (swipeDistance < 0) {
+          nextTestimonial();
+        } else {
+          prevTestimonial();
+        }
+      }
+      startTestimonialAutoPlay();
+    }, { passive: true });
   }
+
+  // Initialize carousel on load
+  updateTestimonialCarousel(0, true);
+  startTestimonialAutoPlay();
 
   // 11. Lead Generation Form Submission
   const leadForm = document.getElementById('leadForm');
